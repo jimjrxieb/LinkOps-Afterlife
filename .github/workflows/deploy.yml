@@ -2,7 +2,7 @@ name: Deploy AfterLife
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
     paths:
       - "frontend/**"
       - "backend/**"
@@ -11,8 +11,7 @@ on:
       - ".github/workflows/deploy.yml"
 
 env:
-  REGISTRY: ghcr.io
-  GHCR_NAMESPACE: ${{ github.repository_owner }}
+  ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
   IMAGE_TAG: sha-${{ github.sha }}
 
 jobs:
@@ -20,26 +19,25 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login $REGISTRY -u ${{ github.actor }} --password-stdin
+      - name: Login to Azure Container Registry
+        run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
 
-      - name: Build frontend image
+      - name: Build and push frontend image
         run: |
-          docker build -t $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-frontend:${{ env.IMAGE_TAG }} ./frontend
-          docker tag $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-frontend:${{ env.IMAGE_TAG }} $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-frontend:latest
-          docker push $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-frontend:${{ env.IMAGE_TAG }}
-          docker push $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-frontend:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/afterlife-frontend:${{ env.IMAGE_TAG }} ./frontend
+          docker tag ${{ env.ACR_LOGIN_SERVER }}/afterlife-frontend:${{ env.IMAGE_TAG }} ${{ env.ACR_LOGIN_SERVER }}/afterlife-frontend:latest
+          docker push ${{ env.ACR_LOGIN_SERVER }}/afterlife-frontend:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/afterlife-frontend:latest
 
-      - name: Build backend image
+      - name: Build and push backend image
         run: |
-          docker build -t $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-backend:${{ env.IMAGE_TAG }} ./backend
-          docker tag $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-backend:${{ env.IMAGE_TAG }} $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-backend:latest
-          docker push $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-backend:${{ env.IMAGE_TAG }}
-          docker push $REGISTRY/${{ env.GHCR_NAMESPACE }}/afterlife-backend:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/afterlife-backend:${{ env.IMAGE_TAG }} ./backend
+          docker tag ${{ env.ACR_LOGIN_SERVER }}/afterlife-backend:${{ env.IMAGE_TAG }} ${{ env.ACR_LOGIN_SERVER }}/afterlife-backend:latest
+          docker push ${{ env.ACR_LOGIN_SERVER }}/afterlife-backend:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ACR_LOGIN_SERVER }}/afterlife-backend:latest
 
   deploy:
     runs-on: ubuntu-latest
@@ -67,9 +65,9 @@ jobs:
             cd ~/afterlife
             # Prepare .env if not present (one-time). You can also manage it manually.
             [ -f .env ] || cp .env.example .env
-            sed -i "s|GHCR_NAMESPACE=.*|GHCR_NAMESPACE=${{ env.GHCR_NAMESPACE }}|g" .env
+            sed -i "s|ACR_LOGIN_SERVER=.*|ACR_LOGIN_SERVER=${{ secrets.ACR_LOGIN_SERVER }}|g" .env
             sed -i "s|IMAGE_TAG=.*|IMAGE_TAG=latest|g" .env
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker login ${{ secrets.ACR_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker system prune -f

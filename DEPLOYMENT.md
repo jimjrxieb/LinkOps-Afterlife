@@ -18,6 +18,9 @@ Add these secrets to your GitHub repository (`Settings > Secrets and variables >
 - `VM_HOST`: Your Azure VM public IP or domain name
 - `VM_USER`: SSH username (usually the user you created the VM with)  
 - `VM_SSH_KEY`: Private SSH key content (PEM format) with access to the VM
+- `ACR_LOGIN_SERVER`: linkops.azurecr.io
+- `ACR_USERNAME`: ACR admin username from Azure portal
+- `ACR_PASSWORD`: ACR admin password from Azure portal
 
 ### 3. Configure Domain & .env
 Edit `~/afterlife/.env` on your VM with:
@@ -25,6 +28,9 @@ Edit `~/afterlife/.env` on your VM with:
 ```env
 DOMAIN=afterlife.yourdomain.com
 ACME_EMAIL=you@example.com
+ACR_LOGIN_SERVER=linkops.azurecr.io
+ACR_USERNAME=your_acr_admin_username
+ACR_PASSWORD=your_acr_admin_password
 SECRET_KEY=your-secure-jwt-secret-here
 D_ID_API_KEY=your_d_id_api_key_here
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
@@ -32,6 +38,22 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 
 ### 4. Deploy
 Push to `main` branch → GitHub Actions automatically builds & deploys!
+
+### Manual Deployment (Alternative)
+For manual deployment or testing:
+
+```bash
+# 1. Login to Azure Container Registry
+docker login linkops.azurecr.io -u "$ACR_USERNAME" -p "$ACR_PASSWORD"
+
+# 2. Pull latest images and deploy
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+
+# 3. Verify deployment
+curl -I https://yourdomain.com/
+curl -s https://yourdomain.com/healthz
+```
 
 ---
 
@@ -61,9 +83,9 @@ Internet → Caddy (80/443) → Frontend (8080) + Backend (8000)
 - `.github/workflows/deploy.yml`
 
 **Process:**
-1. Build & push Docker images to GitHub Container Registry
+1. Build & push Docker images to Azure Container Registry
 2. SSH to Azure VM
-3. Pull latest images
+3. Login to ACR and pull latest images
 4. Deploy with `docker compose up -d`
 5. Clean up old images
 

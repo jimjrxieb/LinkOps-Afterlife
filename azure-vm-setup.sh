@@ -35,8 +35,10 @@ if [ ! -f .env ]; then
 DOMAIN=YOUR_DOMAIN_HERE.com
 ACME_EMAIL=YOUR_EMAIL_HERE@example.com
 
-# GitHub Container Registry
-GHCR_NAMESPACE=jimjrxieb
+# Azure Container Registry
+ACR_LOGIN_SERVER=linkops.azurecr.io
+ACR_USERNAME=YOUR_ACR_ADMIN_USERNAME
+ACR_PASSWORD=YOUR_ACR_ADMIN_PASSWORD
 IMAGE_TAG=latest
 
 # Backend Configuration (CHANGE THE SECRET KEY!)

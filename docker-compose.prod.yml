@@ -23,7 +23,7 @@ services:
       - prometheus
 
   frontend:
-    image: ghcr.io/${GHCR_NAMESPACE}/afterlife-frontend:${IMAGE_TAG}
+    image: ${ACR_LOGIN_SERVER}/afterlife-frontend:${IMAGE_TAG}
     container_name: afterlife-frontend
     restart: unless-stopped
     env_file:
@@ -35,7 +35,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/${GHCR_NAMESPACE}/afterlife-backend:${IMAGE_TAG}
+    image: ${ACR_LOGIN_SERVER}/afterlife-backend:${IMAGE_TAG}
     container_name: afterlife-backend
     restart: unless-stopped
     env_file:
