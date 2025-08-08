@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: linkops-afterlife-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./db:/app/db
+      - ./backend:/app
+    environment:
+      - D_ID_API_KEY=${D_ID_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on: []
+    networks:
+      - linkops-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: linkops-afterlife-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - linkops-network
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: linkops-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    depends_on:
+      - backend
+      - node-exporter
+      - cadvisor
+    networks:
+      - linkops-network
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: linkops-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - linkops-network
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: linkops-node-exporter
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    networks:
+      - linkops-network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: linkops-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /cgroup:/cgroup:ro
+    networks:
+      - linkops-network
+
+  test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: linkops-afterlife-test
+    command: pytest -v --tb=short --cov=. --cov-report=html --cov-report=term
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./db:/app/db
+    environment:
+      - D_ID_API_KEY=test_d_id_key
+      - ELEVENLABS_API_KEY=test_elevenlabs_key
+      - SECRET_KEY=test_secret_key_for_testing
+      - PYTHONPATH=/app
+    depends_on:
+      - backend
+    networks:
+      - linkops-network
+    profiles:
+      - testing
+
+networks:
+  linkops-network:
+    driver: bridge
+
+volumes:
+  linkops-data:
+    driver: local
+  linkops-models:
+    driver: local
+  linkops-db:
+    driver: local
+  prom_data:
+    driver: local
+  grafana_data:
+    driver: local
