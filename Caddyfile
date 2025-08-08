@@ -5,7 +5,7 @@
 
 {env.DOMAIN} {
   encode gzip zstd
-  @api path /api/* /docs /openapi.json /ping /healthz /metrics /register /login /consent/* /delete_session/* /upload /fine_tune_bio/* /preprocess_photo/* /session/* /generate_avatar/* /validate_d_id_key /clone_voice/* /generate_speech/* /validate_elevenlabs_key /voice_info/* /process_text/* /fine_tune_conversation/* /generate_conversation/* /conversation_model_info/* /interact/* /interaction_history/* /session_status/*
+  @api path /api/* /docs /openapi.json /ping /healthz /metrics /personas /personas/* /chat /chat/* /register /login /consent/* /delete_session/* /upload /fine_tune_bio/* /preprocess_photo/* /session/* /generate_avatar/* /validate_d_id_key /clone_voice/* /generate_speech/* /validate_elevenlabs_key /voice_info/* /process_text/* /fine_tune_conversation/* /generate_conversation/* /conversation_model_info/* /interact/* /interaction_history/* /session_status/*
   handle @api {
     reverse_proxy backend:8000
   }

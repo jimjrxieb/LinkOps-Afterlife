@@ -7,10 +7,11 @@ from preprocess import preprocess_photo, get_image_info, process_multiple_photos
 from avatar import generate_avatar, get_video_info, validate_d_id_api_key
 from voice import clone_voice, generate_speech, get_voice_info, validate_elevenlabs_api_key, list_available_voices
 from text_processor import process_text_data
-from conversation import fine_tune_conversation_model, generate_conversation_response
+from conversation import fine_tune_conversation_model, generate_conversation_response, generate_persona_response
 from integration import generate_interactive_response, get_interaction_history, validate_session_requirements
 from auth import AuthManager
 from utils import FileValidator, FileEncryption, SessionManager, save_upload_file, generate_secure_filename
+from persona_loader import load_persona, list_available_personas
 import os
 import shutil
 import json
@@ -78,6 +79,110 @@ async def ping():
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+# ====== PERSONA API ENDPOINTS ======
+
+@app.get("/personas")
+async def list_personas():
+    """List all available personas."""
+    try:
+        personas = list_available_personas()
+        return JSONResponse(
+            status_code=200,
+            content={
+                "personas": personas,
+                "count": len(personas),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error listing personas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list personas: {str(e)}")
+
+@app.get("/personas/{persona_id}")
+async def get_persona(persona_id: str):
+    """Get details for a specific persona."""
+    try:
+        persona = load_persona(persona_id)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "persona": persona.dict(),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+    except FileNotFoundError:
+        available = list_available_personas()
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Persona '{persona_id}' not found. Available personas: {available}"
+        )
+    except Exception as e:
+        logger.error(f"Error loading persona {persona_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load persona: {str(e)}")
+
+@app.post("/chat")
+async def chat_with_persona(body: dict = Body(...)):
+    """Generate a response using a specific persona."""
+    try:
+        persona_id = body.get("persona_id", "james")  # Default to james
+        user_input = body.get("message", "")
+        context = body.get("context", "")
+        
+        if not user_input.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Message is required and cannot be empty"
+            )
+        
+        # Generate response using persona system
+        response_data = generate_persona_response(persona_id, user_input, context)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "response": response_data,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+@app.post("/chat/{persona_id}")
+async def chat_with_specific_persona(persona_id: str, body: dict = Body(...)):
+    """Generate a response using a specific persona (URL parameter)."""
+    try:
+        user_input = body.get("message", "")
+        context = body.get("context", "")
+        
+        if not user_input.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Message is required and cannot be empty"
+            )
+        
+        # Generate response using persona system
+        response_data = generate_persona_response(persona_id, user_input, context)
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "response": response_data,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat with {persona_id} error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+# ====== END PERSONA ENDPOINTS ======
 
 # Authentication endpoints
 @app.post("/register")

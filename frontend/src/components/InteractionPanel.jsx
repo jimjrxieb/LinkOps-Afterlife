@@ -16,7 +16,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider
+  Divider,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import {
   Send,
@@ -27,7 +31,8 @@ import {
   VolumeOff,
   Fullscreen,
   Download,
-  Refresh
+  Refresh,
+  Person
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -42,6 +47,12 @@ const InteractionPanel = ({ sessionId }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [videoDialog, setVideoDialog] = useState(false);
   
+  // Persona state
+  const [selectedPersona, setSelectedPersona] = useState('james');
+  const [availablePersonas, setAvailablePersonas] = useState([]);
+  const [personaInfo, setPersonaInfo] = useState(null);
+  const [personaLoading, setPersonaLoading] = useState(false);
+  
   const videoRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -49,8 +60,113 @@ const InteractionPanel = ({ sessionId }) => {
     scrollToBottom();
   }, [conversations]);
 
+  useEffect(() => {
+    loadAvailablePersonas();
+    if (selectedPersona) {
+      loadPersonaInfo(selectedPersona);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedPersona) {
+      loadPersonaInfo(selectedPersona);
+    }
+  }, [selectedPersona]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Persona management functions
+  const loadAvailablePersonas = async () => {
+    try {
+      const response = await axios.get('/personas');
+      setAvailablePersonas(response.data.personas || []);
+    } catch (error) {
+      console.error('Error loading personas:', error);
+      setAvailablePersonas(['james']); // Fallback to default
+    }
+  };
+
+  const loadPersonaInfo = async (personaId) => {
+    setPersonaLoading(true);
+    try {
+      const response = await axios.get(`/personas/${personaId}`);
+      setPersonaInfo(response.data.persona);
+    } catch (error) {
+      console.error('Error loading persona info:', error);
+      setPersonaInfo(null);
+    }
+    setPersonaLoading(false);
+  };
+
+  const handlePersonaChange = (event) => {
+    setSelectedPersona(event.target.value);
+  };
+
+  // Simple persona chat function (without video generation)
+  const handlePersonaChat = async () => {
+    if (!message.trim()) return;
+    
+    const userMessage = message.trim();
+    setMessage('');
+    setLoading(true);
+    setError(null);
+    
+    // Add user message to conversation
+    setConversations(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        type: 'user',
+        content: userMessage,
+        timestamp: new Date().toISOString()
+      }
+    ]);
+
+    try {
+      const response = await axios.post('/chat', {
+        message: userMessage,
+        persona_id: selectedPersona,
+        context: ""
+      });
+
+      const chatResponse = response.data.response;
+      
+      // Add persona response to conversation
+      setConversations(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          type: 'persona',
+          content: chatResponse.answer,
+          persona_name: chatResponse.persona_name,
+          matched_qa: chatResponse.matched_qa,
+          tts_voice: chatResponse.tts_voice,
+          timestamp: new Date().toISOString()
+        }
+      ]);
+
+    } catch (err) {
+      console.error('Persona chat error:', err);
+      setError(
+        err.response?.data?.detail || 
+        'Failed to generate response. Please try again.'
+      );
+      
+      // Add error message to conversation
+      setConversations(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          type: 'error',
+          content: 'Sorry, I encountered an error generating a response.',
+          timestamp: new Date().toISOString()
+        }
+      ]);
+    }
+    
+    setLoading(false);
   };
 
   const handleSendMessage = async () => {
@@ -154,6 +270,7 @@ const InteractionPanel = ({ sessionId }) => {
   const renderMessage = (conversation) => {
     const isUser = conversation.type === 'user';
     const isError = conversation.type === 'error';
+    const isPersona = conversation.type === 'persona';
 
     return (
       <Box
@@ -165,11 +282,30 @@ const InteractionPanel = ({ sessionId }) => {
         <Card
           sx={{
             maxWidth: '70%',
-            bgcolor: isUser ? 'primary.main' : isError ? 'error.main' : 'grey.100',
+            bgcolor: isUser ? 'primary.main' : isError ? 'error.main' : isPersona ? 'secondary.light' : 'grey.100',
             color: isUser || isError ? 'white' : 'text.primary'
           }}
         >
           <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+            {/* Persona header */}
+            {isPersona && conversation.persona_name && (
+              <Box display="flex" alignItems="center" gap={1} mb={1}>
+                <Person fontSize="small" />
+                <Typography variant="caption" fontWeight="bold">
+                  {conversation.persona_name}
+                </Typography>
+                {conversation.matched_qa && (
+                  <Chip
+                    label="Pinned Q&A"
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ height: 16, fontSize: '0.65rem' }}
+                  />
+                )}
+              </Box>
+            )}
+            
             <Typography variant="body1">
               {conversation.content}
             </Typography>
@@ -202,12 +338,45 @@ const InteractionPanel = ({ sessionId }) => {
     <Paper elevation={3} sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box p={2} borderBottom={1} borderColor="divider">
-        <Typography variant="h5" component="h2">
-          Chat with Avatar
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Session: {sessionId}
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box>
+            <Typography variant="h5" component="h2">
+              Chat with Avatar
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Session: {sessionId}
+            </Typography>
+          </Box>
+          
+          {/* Persona Selector */}
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel>Persona</InputLabel>
+            <Select
+              value={selectedPersona}
+              onChange={handlePersonaChange}
+              label="Persona"
+              startAdornment={<Person sx={{ mr: 1, color: 'action.active' }} />}
+            >
+              {availablePersonas.map((persona) => (
+                <MenuItem key={persona} value={persona}>
+                  {persona.charAt(0).toUpperCase() + persona.slice(1)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+        
+        {/* Persona Info */}
+        {personaInfo && !personaLoading && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>{personaInfo.display_name}</strong> - {personaInfo.style.tone}
+            </Typography>
+            <Typography variant="caption" display="block">
+              {personaInfo.memory.bio.substring(0, 100)}...
+            </Typography>
+          </Alert>
+        )}
       </Box>
 
       {/* Current Video Display */}
@@ -320,18 +489,34 @@ const InteractionPanel = ({ sessionId }) => {
             variant="outlined"
             size="small"
           />
-          <Button
-            variant="contained"
-            onClick={handleSendMessage}
-            disabled={loading || !message.trim()}
-            sx={{ minWidth: 60 }}
-          >
-            {loading ? <CircularProgress size={20} /> : <Send />}
-          </Button>
+          <Box display="flex" flexDirection="column" gap={1}>
+            <Tooltip title="Quick persona chat (text only)">
+              <Button
+                variant="outlined"
+                onClick={handlePersonaChat}
+                disabled={loading || !message.trim()}
+                sx={{ minWidth: 60, flex: 1 }}
+                size="small"
+              >
+                {loading ? <CircularProgress size={16} /> : <Send />}
+              </Button>
+            </Tooltip>
+            <Tooltip title="Full avatar response (video + voice)">
+              <Button
+                variant="contained"
+                onClick={handleSendMessage}
+                disabled={loading || !message.trim()}
+                sx={{ minWidth: 60, flex: 1 }}
+                size="small"
+              >
+                {loading ? <CircularProgress size={16} /> : <Videocam />}
+              </Button>
+            </Tooltip>
+          </Box>
         </Box>
         
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          Press Enter to send, Shift+Enter for new line
+          Text: Quick persona response | Video: Full avatar with voice
         </Typography>
       </Box>
 

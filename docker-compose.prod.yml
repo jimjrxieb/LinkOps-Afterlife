@@ -46,6 +46,7 @@ services:
     volumes:
       - app_db:/app/db
       - app_data:/app/data
+      - ./data/personas:/app/data/personas:ro
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8000/ping"]
       interval: 15s
@@ -114,6 +115,19 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /cgroup:/cgroup:ro
 
+  # Optional: Local TTS service for voice synthesis
+  tts:
+    image: rhasspy/wyoming-piper:latest
+    container_name: afterlife-tts
+    restart: unless-stopped
+    ports:
+      - "10200:10200"
+    environment:
+      - PIPER_VOICE=en_US-lessac-medium
+    volumes:
+      - tts_data:/data
+    profiles: ["tts"]  # Optional profile - enable with --profile tts
+
 volumes:
   app_db:
   app_data:
@@ -121,3 +135,4 @@ volumes:
   caddy_config:
   prom_data:
   grafana_data:
+  tts_data:

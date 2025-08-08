@@ -4,6 +4,8 @@ import uuid
 from typing import Dict, List, Optional
 from datetime import datetime
 import logging
+from persona_loader import load_persona, list_available_personas
+from persona_models import PersonaConfig
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -390,6 +392,193 @@ def generate_conversation_response(model_config: Dict, user_input: str, context:
 def validate_model_config(model_config: Dict) -> bool:
     """Validate the model configuration."""
     required_fields = ["model_id", "model_type", "created_timestamp"]
+
+
+# ====== PERSONA-BASED CONVERSATION SYSTEM ======
+
+PERSONA_SYSTEM_TEMPLATE = """You are {display_name}.
+
+Communication Style:
+- Tone: {tone}
+- Formality: {register}
+- Quirks: {quirks}
+
+Professional Background:
+{bio}
+
+Elevator Pitch:
+{elevator_pitch}
+
+Key Highlights:
+{highlights}
+
+Projects:
+{projects}
+
+Certifications: {certs}
+
+Boundaries: 
+- Safe topics: {safe_topics}
+- Avoid discussing: {avoid_topics}
+- If asked about avoided topics, use one of these responses: {refusals}
+
+Guidelines:
+- Answer clearly and concisely
+- Use step-by-step explanations when giving instructions
+- Stay in character and maintain your professional tone
+- When appropriate, reference your projects and experience
+- If a question matches your pinned Q&A, prefer that answer but expand naturally
+"""
+
+
+def build_persona_system_prompt(persona: PersonaConfig) -> str:
+    """
+    Build a comprehensive system prompt from a persona configuration.
+    
+    Args:
+        persona: PersonaConfig object with all persona details
+        
+    Returns:
+        str: Formatted system prompt for the conversation model
+    """
+    # Format projects as bullet points
+    projects_text = "\n".join([f"- {name}: {desc}" for name, desc in persona.memory.projects.items()])
+    
+    return PERSONA_SYSTEM_TEMPLATE.format(
+        display_name=persona.display_name,
+        tone=persona.style.tone,
+        register=persona.style.register,
+        quirks="; ".join(persona.style.quirks) if persona.style.quirks else "None specified",
+        bio=persona.memory.bio,
+        elevator_pitch=persona.memory.elevator_pitch,
+        highlights="\\n".join([f"• {h}" for h in persona.memory.highlights]),
+        projects=projects_text,
+        certs=", ".join(persona.memory.certs) if persona.memory.certs else "None listed",
+        safe_topics=", ".join(persona.boundaries.safe_topics),
+        avoid_topics=", ".join(persona.boundaries.avoid_topics),
+        refusals=" / ".join(persona.boundaries.refusals)
+    )
+
+
+def find_matching_pinned_qa(persona: PersonaConfig, user_input: str) -> Optional[Dict[str, str]]:
+    """
+    Find a matching pinned Q&A pair for the user input.
+    
+    Args:
+        persona: PersonaConfig with pinned Q&A pairs
+        user_input: User's question/input
+        
+    Returns:
+        Dict with 'q' and 'a' keys if match found, None otherwise
+    """
+    user_input_lower = user_input.lower()
+    
+    for qa_pair in persona.qa.pinned:
+        question_lower = qa_pair["q"].lower()
+        
+        # Simple keyword matching - could be enhanced with semantic similarity
+        if any(word in user_input_lower for word in question_lower.split() if len(word) > 3):
+            return qa_pair
+    
+    return None
+
+
+def generate_persona_response(persona_id: str, user_input: str, context: str = "") -> Dict[str, str]:
+    """
+    Generate a conversation response using persona-based prompting.
+    
+    Args:
+        persona_id: ID of the persona to use
+        user_input: User's message/question
+        context: Additional context for the conversation
+        
+    Returns:
+        Dict with 'answer', 'persona_id', 'tts_voice', and 'matched_qa' keys
+    """
+    try:
+        # Load persona configuration
+        persona = load_persona(persona_id)
+        
+        # Build system prompt
+        system_prompt = build_persona_system_prompt(persona)
+        
+        # Check for matching pinned Q&A
+        matched_qa = find_matching_pinned_qa(persona, user_input)
+        
+        # Build guided response context if we found a match
+        guided_context = ""
+        if matched_qa:
+            guided_context = f"\\nPinned Q&A Reference (expand naturally on this):\\nQ: {matched_qa['q']}\\nA: {matched_qa['a']}\\n"
+        
+        # For now, return a structured response
+        # In production, this would call your LLM with the system prompt
+        if matched_qa:
+            # Use pinned answer as base, but could be enhanced by LLM
+            response = matched_qa["a"]
+        else:
+            # Generate contextual response based on persona
+            response = generate_contextual_response(persona, user_input)
+        
+        return {
+            "answer": response,
+            "persona_id": persona_id,
+            "persona_name": persona.display_name,
+            "tts_voice": persona.tts_voice,
+            "matched_qa": matched_qa is not None,
+            "system_prompt_preview": system_prompt[:200] + "..." if len(system_prompt) > 200 else system_prompt
+        }
+        
+    except FileNotFoundError:
+        logger.error(f"Persona not found: {persona_id}")
+        return {
+            "answer": f"Sorry, I couldn't find the persona '{persona_id}'. Available personas: {list_available_personas()}",
+            "persona_id": persona_id,
+            "persona_name": "Unknown",
+            "tts_voice": None,
+            "matched_qa": False,
+            "error": "Persona not found"
+        }
+    except Exception as e:
+        logger.error(f"Error generating persona response: {e}")
+        return {
+            "answer": f"I'm having trouble processing that request. Error: {str(e)}",
+            "persona_id": persona_id,
+            "persona_name": "Error",
+            "tts_voice": None,
+            "matched_qa": False,
+            "error": str(e)
+        }
+
+
+def generate_contextual_response(persona: PersonaConfig, user_input: str) -> str:
+    """
+    Generate a contextual response based on persona characteristics.
+    This is a simplified version - in production, this would use an LLM.
+    
+    Args:
+        persona: PersonaConfig object
+        user_input: User's input/question
+        
+    Returns:
+        str: Generated response
+    """
+    user_lower = user_input.lower()
+    
+    # Check for project-related questions
+    for project_name, project_desc in persona.memory.projects.items():
+        if project_name.lower() in user_lower:
+            return f"Great question about {project_name}! {project_desc}. I built this because I believe in {persona.memory.elevator_pitch.split('.')[0].lower()}."
+    
+    # Check for skills/certification questions
+    if any(cert.lower() in user_lower for cert in persona.memory.certs):
+        return f"Yes, I'm certified in {', '.join(persona.memory.certs)}. These certifications are crucial for the work I do in {persona.memory.bio.split('.')[0].lower()}."
+    
+    # Check for general "about you" questions
+    if any(word in user_lower for word in ["who", "about", "tell me", "background"]):
+        return f"{persona.memory.elevator_pitch} Some highlights of my work include: {'; '.join(persona.memory.highlights[:2])}."
+    
+    # Default response with personality
+    return f"That's an interesting question! {persona.memory.bio.split('.')[0]}. I'd be happy to discuss how this relates to my work with {', '.join(list(persona.memory.projects.keys())[:2])}."
     
     for field in required_fields:
         if field not in model_config:
