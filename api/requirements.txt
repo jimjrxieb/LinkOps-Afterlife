@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+transformers
+torch
+chromadb
+sentence-transformers
+python-multipart
+pyyaml
+requests
+openai>=1.40.0

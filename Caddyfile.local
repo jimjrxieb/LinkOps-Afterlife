@@ -1,0 +1,25 @@
+# Local development Caddyfile - HTTP only, no SSL
+{
+  admin off
+}
+
+:80 {
+  encode gzip zstd
+  
+  @api path /api/* /docs /openapi.json /ping /healthz /metrics /personas /personas/* /chat /chat/* /register /login /consent/* /delete_session/* /upload /fine_tune_bio/* /preprocess_photo/* /session/* /generate_avatar/* /validate_d_id_key /clone_voice/* /generate_speech/* /validate_elevenlabs_key /voice_info/* /process_text/* /fine_tune_conversation/* /generate_conversation/* /conversation_model_info/* /interact/* /interaction_history/* /session_status/*
+  
+  handle @api {
+    reverse_proxy backend:8000
+  }
+
+  handle {
+    reverse_proxy frontend:8080
+  }
+
+  # Security headers (relaxed for local development)
+  header /* {
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "no-referrer-when-downgrade"
+  }
+}

@@ -37,8 +37,8 @@ COPY . .
 # Create data and models directories for volume mounting
 RUN mkdir -p /app/data /app/models /app/db
 
-# Download NLTK data during build
-RUN python -c "import nltk; nltk.download('punkt', quiet=True); nltk.download('stopwords', quiet=True); nltk.download('vader_lexicon', quiet=True)"
+# Download NLTK data during build (optional - will download at runtime if needed)
+RUN python -c "import nltk; nltk.download('punkt', quiet=True, download_dir='/app/nltk_data') or True; nltk.download('stopwords', quiet=True, download_dir='/app/nltk_data') or True; nltk.download('vader_lexicon', quiet=True, download_dir='/app/nltk_data') or True" || true
 
 # Expose the port that FastAPI runs on
 EXPOSE 8000

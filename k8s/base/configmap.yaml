@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: afterlife-config
+  namespace: linkops-afterlife
+data:
+  # LLM
+  LLM_ENGINE: "local"
+  LLM_MODEL: "Qwen/Qwen2.5-1.5B-Instruct"
+  EMBED_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  # RAG storage
+  CHROMA_DIR: "/app/models/chroma"
+  # Engines
+  TTS_ENGINE: "local"
+  AVATAR_ENGINE: "local"
+  # CORS
+  CORS_ALLOW_ORIGINS: "*"
+  # Job storage
+  TMP_ROOT: "/app/tmp"
+  JOB_TTL_SEC: "1800"

@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: afterlife-cleanup
+  namespace: linkops-afterlife
+spec:
+  schedule: "*/15 * * * *"  # every 15 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: python:3.11-slim
+              env:
+                - name: TMP_ROOT
+                  value: /app/tmp
+                - name: JOB_TTL_SEC
+                  value: "1800"  # 30 minutes
+              volumeMounts:
+                - name: tmpvol
+                  mountPath: /app/tmp
+              command: ["python", "-c"]
+              args:
+                - |
+                  import os, time, shutil, logging
+                  logging.basicConfig(level=logging.INFO)
+                  logger = logging.getLogger(__name__)
+                  
+                  root = os.getenv('TMP_ROOT', '/app/tmp')
+                  ttl = int(os.getenv('JOB_TTL_SEC', '1800'))
+                  now = time.time()
+                  
+                  os.makedirs(root, exist_ok=True)
+                  purged = 0
+                  
+                  for name in os.listdir(root):
+                      p = os.path.join(root, name)
+                      if os.path.isdir(p):
+                          age = now - os.path.getmtime(p)
+                          if age > ttl:
+                              try:
+                                  shutil.rmtree(p)
+                                  purged += 1
+                                  logger.info(f"Purged expired job: {name} (age: {int(age)}s)")
+                              except Exception as e:
+                                  logger.error(f"Failed to purge {name}: {e}")
+                  
+                  logger.info(f"Cleanup complete. Purged {purged} expired jobs.")
+          volumes:
+            - name: tmpvol
+              persistentVolumeClaim:
+                claimName: models-pvc  # Reuse the models PVC for /app/tmp

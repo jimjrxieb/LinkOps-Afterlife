@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: linkops-afterlife
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: api
+  template:
+    metadata:
+      labels:
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/shadow-link-industries/linkops-afterlife-api:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: afterlife-config
+        - secretRef:
+            name: afterlife-secrets
+            optional: true
+        volumeMounts:
+        - name: models
+          mountPath: /app/models
+        - name: models
+          mountPath: /app/tmp
+          subPath: tmp
+        - name: media
+          mountPath: /app/media
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: models-pvc
+      - name: media
+        emptyDir: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: models-pvc
+  namespace: linkops-afterlife
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

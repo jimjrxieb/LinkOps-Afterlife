@@ -1,7 +1,16 @@
 .
 ├── -Tree.txt
+├── ACR_DEPLOYMENT_GUIDE.md
+├── Caddyfile
+├── Caddyfile.local
+├── DEPLOYMENT.md
+├── DEPLOY_NOW.md
+├── MONITORING.md
+├── PERSONA_TESTS.md
+├── README.md
 ├── SECURITY_SETUP.md
 ├── TESTING.md
+├── azure-vm-setup.sh
 ├── backend
 │   ├── Dockerfile
 │   ├── auth.py
@@ -12,6 +21,8 @@
 │   ├── integration.py
 │   ├── main.py
 │   ├── models
+│   ├── persona_loader.py
+│   ├── persona_models.py
 │   ├── preprocess.py
 │   ├── pytest.ini
 │   ├── requirements.txt
@@ -65,16 +76,14 @@
 │   │   └── pyvenv.cfg
 │   └── voice.py
 ├── data
+│   └── personas
+│       └── james.yaml
 ├── db
 │   └── users.db
+├── deploy-production.sh
+├── docker-compose.local.yml
+├── docker-compose.prod.yml
 ├── docker-compose.yml
-├── monitoring
-│   ├── grafana
-│   │   └── provisioning
-│   │       ├── dashboards
-│   │       └── datasources
-│   └── prometheus
-│       └── prometheus.yml
 ├── frontend
 │   ├── Dockerfile
 │   ├── README.md
@@ -121,6 +130,27 @@
 │   │   ├── index.css
 │   │   └── main.jsx
 │   └── vite.config.js
-└── models
+├── models
+├── monitoring
+│   ├── README.md
+│   ├── grafana
+│   │   └── provisioning
+│   │       ├── dashboards
+│   │       │   ├── afterlife-overview.json
+│   │       │   ├── dashboard-config.yml
+│   │       │   ├── dashboards.yml
+│   │       │   ├── json
+│   │       │   └── system-metrics.json
+│   │       └── datasources
+│   │           ├── datasource.yml
+│   │           └── prometheus.yml
+│   └── prometheus
+│       └── prometheus.yml
+├── persona_server.py
+├── server.log
+├── test-local-monitoring.sh
+├── test-local-simple.sh
+├── test-local.sh
+└── verify-monitoring.sh
 
-26 directories, 90 files
+34 directories, 119 files
