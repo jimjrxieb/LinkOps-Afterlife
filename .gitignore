@@ -1,19 +1,17 @@
 # node
 ui/node_modules
 ui/dist
-frontend/node_modules
-frontend/dist
 
 # python
 api/__pycache__/
 api/.venv
-backend/venv
 api/models/
 api/media/
-models/
 
 # env & local
 .env
 .env.*
 server.log
-db/
+
+# data
+data/tmp/

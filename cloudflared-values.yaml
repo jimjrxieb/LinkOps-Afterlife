@@ -1,0 +1,14 @@
+# cloudflared-values.yaml
+credentials:
+  # cloudflared chart will read the token from this secret
+  existingSecret: cloudflared-token
+  secretKey: tunnelToken
+
+# Map host/path → K8s services (adjusted for your actual service names and ports)
+ingress:
+  - hostname: linkopsmlm.com
+    service: http://ui.linkops-afterlife.svc.cluster.local:5173
+  - hostname: linkopsmlm.com
+    path: /api/*
+    service: http://api.linkops-afterlife.svc.cluster.local:8000
+  - service: http_status:404
