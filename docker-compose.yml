@@ -2,30 +2,21 @@ services:
   api:
     build: { context: ./api }
     environment:
-      # LLM
       - LLM_ENGINE=local
       - LLM_MODEL=Qwen/Qwen2.5-1.5B-Instruct
       - EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
-      # RAG storage
       - CHROMA_DIR=/app/models/chroma
-      # Engines
       - TTS_ENGINE=local
       - AVATAR_ENGINE=local
-      # CORS
       - CORS_ALLOW_ORIGINS=*
-      # Job storage
       - TMP_ROOT=/app/tmp
       - JOB_TTL_SEC=1800
-      # API Keys (optional)
-      - OPENAI_API_KEY=
-      - ELEVENLABS_API_KEY=
-      - DID_API_KEY=
     volumes:
       - ./api/models:/app/models
       - ./api/media:/app/media
       - ./data:/app_data
     ports: ["8000:8000"]
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
     working_dir: /app
 
   ui:
